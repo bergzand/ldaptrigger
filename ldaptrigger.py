@@ -17,7 +17,6 @@ import Queue
 import threading
 
 loghandle = None
-socket_location = "ldaptrigger.sock"
 registeredhooks = []
 
 
@@ -38,29 +37,27 @@ def callback(request):
             loghandle.debug("dispatching item to queue")
             hookqueue.put(item)
 
+#main function
 if __name__ == '__main__':
     #load config
     config = config.cfg('ldaptrigger.conf')
     #set up logging
     logding = log.log("blaat")
     logding.setConf(config.getLoggerCfg())
+    #get loghandle
     loghandle = logding.getLoggerHandle("main")
+    #add logging to the config functions
     config.addLogging(logding)
-
+    #get list of hooks
     hooklist = config.getHookList()
+    #register each hook in array
     for type, hook, dir, name in hooklist:
         registerhook(type, hook, dir, name)
-    loghandle.info("setting up socket")
-    try:
-        os.unlink(socket_location)
-        loghandle.debug("removed old socket")
-    except:
-        pass
-    server = udsserver.udsserver(socket_location, 
+    socketconf = config.getSocketInfo()
+    server = udsserver.udsserver(socketconf,
                                  lambda *args, **keys: 
                                      udsserver.udshandler(logding, callback, *args, **keys)
                                  , logding)
-    loghandle.debug("socket ready at %s", socket_location)
     try:
         server.serve_forever()
     except:

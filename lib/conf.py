@@ -6,6 +6,7 @@ class cfg:
     #section info
     MAIN = "main"
     LOGGING = "logging"
+    SOCKET = "socket"
     #hook section info
     HOOKTYPE = "type"
     HOOKHOOK = "hook"
@@ -46,6 +47,13 @@ class cfg:
         self.loghandle.info("Got %s from hooks in config", hooks)
         return hooks
 
+    def getSocketInfo(self):
+        socketinfo = {}
+        for name, value in self.cfparser.items(cfg.SOCKET):
+            socketinfo[name] = value
+        return socketinfo
+   
+    
     @staticmethod
     def getHookType(type):
         import hook
