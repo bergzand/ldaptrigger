@@ -40,25 +40,29 @@ class udshandler(SocketServer.BaseRequestHandler):
         self.loghandle.debug("connection received")
         total_data = []
         data =''
+        unbind = False
         #receive complete ldap message
-        while True:
-            data = self.request.recv(1024)
-            if not data:
-                return
-            self.loghandle.debug("received : %s", data)
-            if data.endswith(endmarker):
-                self.loghandle.debug('complete message received')
+        while not unbind:
+            while True:
+                data = self.request.recv(1024)
+                if not data:
+                    return
+                self.loghandle.debug("received : %s", data)
+                if data.endswith(endmarker):
+                    self.loghandle.debug('complete message received')
+                    total_data.append(data)
+                    break
                 total_data.append(data)
-                break
-            total_data.append(data)
-            if ''.join(total_data).endswith(endmarker):
-                self.loghandle.debug('complete message received')
-                break
-        datagram = ''.join(total_data)
-        self.loghandle.debug('total data: %s', ''.join(total_data))
-        if datagram.split('\n', 1)[0] != "UNBIND":
-            self.request.sendall("RESULT\ncode: 0\n")
-        self._parsemessage(datagram)
+                if ''.join(total_data).endswith(endmarker):
+                    self.loghandle.debug('complete message received')
+                    break
+            datagram = ''.join(total_data)
+            self.loghandle.debug('total data: %s', ''.join(total_data))
+            msgtype = datagram.split('\n', 1)[0]
+            if  msgtype != "UNBIND":
+                self.request.sendall("RESULT\ncode: 0\n")
+            else:
+                unbind = True
 
 
 class udsserver(SocketServer.ThreadingUnixStreamServer):
