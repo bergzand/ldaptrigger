@@ -5,12 +5,15 @@ class log:
         formatter = log.logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.ch = log.logging.StreamHandler()
         self.ch.setFormatter(formatter)
+        self._setConf(conf)
 
-    def getLoggerHandle(self, name):
+    def getLoggerHandle(self, name, loglevel=None):
+        if not loglevel:
+            loglevel = self.conf[1]
         handle = self.logging.getLogger(name)
-        handle.setLevel(self.conf['loglevel'])
+        handle.setLevel(loglevel)
         handle.addHandler(self.ch)
         return handle
 
-    def setConf(self,logconf):
+    def _setConf(self, logconf):
         self.conf = logconf

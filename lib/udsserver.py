@@ -1,7 +1,10 @@
 import SocketServer
 import StringIO
 import ldif
-
+import log 
+import pwd
+import grp
+import os
 
 class udshandler(SocketServer.BaseRequestHandler):
 
@@ -58,39 +61,58 @@ class udshandler(SocketServer.BaseRequestHandler):
         self._parsemessage(datagram)
 
 class udsserver(SocketServer.ThreadingUnixStreamServer):
-    import log
 
     name = "netsrv"
     LOGNAME = "socketserver"
 
     def __init__(self, socketconf, RequestHandlerClass, logger):
-        import pwd
-        import grp
-        import os
 
+        self.socketconf = dict(socketconf)
         self.loghandle = logger.getLoggerHandle(udsserver.name)
         self.loghandle.info("initializing socket server at %s",
-                            socketconf['file'])
+                            self.socketconf['file'])
         try:
-            os.unlink(socketconf['file'])
+            os.unlink(self.socketconf['file'])
             self.loghandle.debug("removed old socket")
         except:
             pass
         #initializing real socketserver init
         SocketServer.ThreadingUnixStreamServer.__init__(self, 
-                                                        socketconf['file'],
+                                                        self.socketconf['file'],
                                                         RequestHandlerClass)
         #setting correct permissions and stuff for the socket file
-        if "mode" in socketconf:
-            self.loghandle.debug("setting mode to %s", socketconf['mode'])
-            os.chmod(socketconf['file'], int(socketconf['mode'], 8))
+        if "mode" in self.socketconf:
+            self.loghandle.debug("setting mode to %s", self.socketconf['mode'])
+            os.chmod(self.socketconf['file'], int(self.socketconf['mode'], 8))
         uid = gid = -1
-        if "user" in socketconf:
-            uid = pwd.getpwnam(socketconf['user']).pw_uid
-        if "group" in socketconf:
-            gid = grp.getgrnam(socketconf['group']).gr_gid
+        if "socketuser" in self.socketconf:
+            uid = pwd.getpwnam(self.socketconf['socketuser']).pw_uid
+        if "socketgroup" in self.socketconf:
+            gid = grp.getgrnam(self.socketconf['socketgroup']).gr_gid
         self.loghandle.debug("setting owner to %s:%s", uid, gid)
-        os.chown(socketconf['file'], uid, gid)
+        os.chown(self.socketconf['file'], uid, gid)
         self.loghandle.debug(" Done setting up socket server at %s",
-                             socketconf['file'])
+                             self.socketconf['file'])
+
         return
+
+    def processStart(self):
+        self._dropToUser(self.socketconf['user'], self.socketconf['group'])
+        self.serve_forever()
+
+    def _dropToUser(self, user, group):
+        if os.getuid() != 0:
+            self.loghandle.info('Not running as root, unable to drop to configged user')
+            # We're not root so, like, whatever dude
+            return
+        # Get the uid/gid from the name
+        running_uid = pwd.getpwnam(user).pw_uid
+        running_gid = grp.getgrnam(group).gr_gid
+        # Remove group privileges
+        os.setgroups([])
+        # Try setting the new uid/gid
+        self.loghandle.info('Dropping to %s:%s', user, group)
+        os.setgid(running_gid)
+        os.setuid(running_uid)
+        # Ensure a very conservative umask
+        old_umask = os.umask(077)

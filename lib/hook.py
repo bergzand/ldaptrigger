@@ -1,33 +1,41 @@
 import os
+import pwd
+import grp
 import sys
 import importlib
 import Queue
-import threading
+import multiprocessing
 import subprocess
 
 class hookhandler:
     #initialize hookhandler and start thread
-    def __init__(self, hookdir, loghandle, queue):
-        self.hookdir = hookdir
+    def __init__(self, hookconf, loghandle, queue):
+        self.hookconf = dict(hookconf)
+        self.hookdir = self.hookconf['hookdir']
         self.queue = queue
         self.loghandle = loghandle
         self.hooks = self.gethooks()
         self.loghandle.debug("starting thread")
-        t = threading.Thread(target=self.run)
-        t.daemon = True
-        t.start()
+        p = multiprocessing.Process(target=self.run)
+        p.daemon = True
+        p.start()
 
-    #def getExecs(includedir):
-        #self.loghandle.info("checking dir")
-        #for root, dirs, files in os.walk(includedir):
-                #for file in files:
-                    #command = os.path.join(root, file)
-                    #output = subprocess.check_output(command)
-                    #self.loghandle.info("got output: %s", output)
-
-    #function to obtain al hooks
-    def gethooks(self):
-        pass
+    def _dropToUser(self, user, group):
+        if os.getuid() != 0:
+            self.loghandle.info('Not running as root, unable to drop to configged user')
+            # We're not root so, like, whatever dude
+            return
+        # Get the uid/gid from the name
+        running_uid = pwd.getpwnam(user).pw_uid
+        running_gid = grp.getgrnam(group).gr_gid
+        # Remove group privileges
+        os.setgroups([])
+        # Try setting the new uid/gid
+        self.loghandle.info('Dropping to %s:%s', user, group)
+        os.setgid(running_gid)
+        os.setuid(running_uid)
+        # Ensure a very conservative umask
+        old_umask = os.umask(077)
 
     def inithooks(self):
         pass
@@ -35,6 +43,7 @@ class hookhandler:
     #function to thread with, should listen on the queue
     def run(self):
         self.inithooks()
+        self._dropToUser(self.hookconf['user'], self.hookconf['group'])
         while True:
             item = self.queue.get()
             self.loghandle.debug("queue item: %s", item)
@@ -105,7 +114,7 @@ class pyhookhandler(hookhandler):
     #initialize the hooks
     def gethooks(self):
         #building path
-        sys.path.append(os.path.join(os.getcwd(),self.hookdir))
+        sys.path.append(os.path.join(os.getcwd(), self.hookdir))
         pyhooks = []
         hookgen = self._getfiles()
         for hook in hookgen:

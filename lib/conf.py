@@ -8,32 +8,34 @@ class cfg:
     LOGGING = "logging"
     SOCKET = "socket"
     #hook section info
-    HOOKTYPE = "type"
+    HOOKTYPE = "hooktype"
+    HOOKNAME = "hookname"
     HOOKHOOK = "hook"
-    HOOKDIR = "dir"
+    HOOKDIR = "hookdir"
+    LOGLEVEL = "loglevel"
     
+    DEFAULTS = {'loglevel': 'WARNING',
+                'hooktype': 'python',
+                'user': 'root',
+                'group': 'root'}
+
     import log
-    
+
     def __init__(self, file):
         import ConfigParser
-        self.cfparser = ConfigParser.SafeConfigParser(allow_no_value=True)
+        self.cfparser = ConfigParser.SafeConfigParser(cfg.DEFAULTS, allow_no_value=True)
         with open(file, 'r') as f:
             self.cfparser.readfp(f)
 
-    def getLoggerCfg(self):
+    def getLoggerCfg(self, section):
         returndata = None
-        if not self.cfparser.has_section(cfg.LOGGING):
-            print "no logging info found, exiting"
+        if not self.cfparser.has_section(section):
             returndata = False
         else:
-            confdata = dict(logfile=self.cfparser.get(cfg.LOGGING, "logfile"),
-                            loglevel=self.cfparser.get(cfg.LOGGING,
-                                                       "loglevel"))
+            confdata = (self.cfparser.get(section, "logfile"),
+                        self.cfparser.get(section, "loglevel"))
             returndata = confdata
         return returndata
-
-    def addLogging(self, logger):
-        self.loghandle = logger.getLoggerHandle(cfg.LOGNAME)
 
     def getHookList(self):
         hooksections = self.cfparser.sections()
@@ -41,19 +43,15 @@ class cfg:
         for hook in hooksections:
             if "hook/" in hook:
                 self.loghandle.debug("Found section: %s", hook)
-                f = lambda option: self.cfparser.get(hook, option) if self.cfparser.has_option(hook, option) else None
-                settings = (f(cfg.HOOKTYPE), f(cfg.HOOKHOOK), f(cfg.HOOKDIR), hook)
-                hooks.append(settings)
+                hookconf = self.getSectionCfg(hook)
+                hookconf.append((cfg.HOOKNAME, hook))
+                hooks.append(hookconf)
         self.loghandle.info("Got %s from hooks in config", hooks)
         return hooks
 
-    def getSocketInfo(self):
-        socketinfo = {}
-        for name, value in self.cfparser.items(cfg.SOCKET):
-            socketinfo[name] = value
-        return socketinfo
-   
-    
+    def getSectionCfg(self,section):
+        return self.cfparser.items(section)
+
     @staticmethod
     def getHookType(type):
         import hook
@@ -61,3 +59,13 @@ class cfg:
             'python': hook.pyhookhandler,
             'exec': hook.exechookhandler,
             }.get(type, hook.exechookhandler)
+
+    def addLogging(self, logger):
+        self.loghandle = logger.getLoggerHandle(cfg.LOGNAME)
+
+class cfsettings:
+    def __init__(self):
+        pass
+
+    def getLogConf(self):
+        pass

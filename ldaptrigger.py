@@ -14,16 +14,21 @@ import subprocess
 import SocketServer
 import traceback
 import Queue
-import threading
+import multiprocessing
 
 loghandle = None
 registeredhooks = []
 
 
-def registerhook(type, hook, dir, name):
-    hookclass = config.getHookType(type)
+def registerhook(hookconf):
+    hookcfg = dict(hookconf)
+    hookclass = config.getHookType(hookcfg['hooktype'])
     hookqueue = Queue.Queue()
-    hookthread = hookclass(dir, logding.getLoggerHandle(name), hookqueue)
+    hookname = hookcfg[config.HOOKNAME]
+    hooklevel = hookcfg[config.LOGLEVEL]
+    hookthread = hookclass(hookconf,
+                           logobject.getLoggerHandle(hookname, hooklevel),
+                           hookqueue)
     registeredhooks.append((hook, hookthread, hookqueue))
 
 
@@ -42,26 +47,23 @@ if __name__ == '__main__':
     #load config
     config = config.cfg('ldaptrigger.conf')
     #set up logging
-    logding = log.log("blaat")
-    logding.setConf(config.getLoggerCfg())
+    logobject = log.log(config.getLoggerCfg("main"))
     #get loghandle
-    loghandle = logding.getLoggerHandle("main")
+    loghandle = logobject.getLoggerHandle("main")
     #add logging to the config functions
-    config.addLogging(logding)
+    config.addLogging(logobject)
     #get list of hooks
+    loghandle.debug("Buidling hooklist")
     hooklist = config.getHookList()
     #register each hook in array
-    for type, hook, dir, name in hooklist:
-        registerhook(type, hook, dir, name)
-    socketconf = config.getSocketInfo()
+    for conf in hooklist:
+        registerhook(conf)
+    socketconf = config.getSectionCfg("socket")
     server = udsserver.udsserver(socketconf,
                                  lambda *args, **keys: 
-                                     udsserver.udshandler(logding, callback, *args, **keys)
-                                 , logding)
-    try:
-        server.serve_forever()
-    except:
-        traceback.print_tb()
-        traceback.print_exception()
-    finally:
-        server.shutdown()
+                                     udsserver.udshandler(logobject, callback, *args, **keys)
+                                 , logobject)
+    serverprocess = multiprocessing.Process(target=server.processStart)
+    serverprocess.daemon=True
+    serverprocess.start()
+    serverprocess.join()
