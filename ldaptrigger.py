@@ -13,38 +13,59 @@ import os
 import subprocess
 import SocketServer
 import traceback
-import Queue
-import multiprocessing
+import sys
+from multiprocessing import Process, Queue
+import signal
 
 loghandle = None
 registeredhooks = []
 
 
+def signalhandler(signum=None, frame=None):
+    loghandle.info("caught signal: %s", signum)
+    #shutdownServer()
+    shutdownProcesses()
+    sys.exit(0)
+
 def registerhook(hookconf):
     hookcfg = dict(hookconf)
     hookclass = config.getHookType(hookcfg['hooktype'])
-    hookqueue = Queue.Queue()
+    hookqueue = Queue()
     hookname = hookcfg[config.HOOKNAME]
     hooklevel = hookcfg[config.LOGLEVEL]
-    hookthread = hookclass(hookconf,
+    hookprocess = hookclass(hookconf,
                            logobject.getLoggerHandle(hookname, hooklevel),
                            hookqueue)
-    registeredhooks.append((hook, hookthread, hookqueue))
+    hookprocess.start()
+    registeredhooks.append((hookname, hook, hookprocess, hookqueue))
 
 
 def callback(request):
     requesthook, dn, mod, result = request
     item = (dn, mod, result)
     loghandle.debug("checking hooks for matching type")
-    for hook, hookthread, hookqueue in registeredhooks:
-        loghandle.debug("trying to match \"%s\" with \"%s\"", requesthook, hook)
+    for hookname, hook, hookprocess, hookqueue in registeredhooks:
+        loghandle.debug("trying to match \"%s\" with \"%s\"", requesthook, hookname)
         if hook == requesthook:
             loghandle.debug("dispatching item to queue")
             hookqueue.put(item)
 
+
+def shutdownProcesses():
+    for hookname, hook, hookprocess, hookqueue in registeredhooks:
+        hookprocess.shutdown()
+        loghandle.info("shutting down %s", hookname)
+        hookqueue.close()
+
+
+def shutdownServer():
+    serverprocess.terminate()
+
+
 #main function
 if __name__ == '__main__':
     #load config
+    signal.signal(15, signalhandler)
     config = config.cfg('ldaptrigger.conf')
     #set up logging
     logobject = log.log(config.getLoggerCfg("main"))
@@ -63,7 +84,7 @@ if __name__ == '__main__':
                                  lambda *args, **keys: 
                                      udsserver.udshandler(logobject, callback, *args, **keys)
                                  , logobject)
-    serverprocess = multiprocessing.Process(target=server.processStart)
+    serverprocess = Process(target=server.processStart)
     serverprocess.daemon=True
     serverprocess.start()
     serverprocess.join()

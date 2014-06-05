@@ -5,7 +5,7 @@ import log
 import pwd
 import grp
 import os
-
+import multiprocessing
 class udshandler(SocketServer.BaseRequestHandler):
 
     import log
@@ -60,6 +60,7 @@ class udshandler(SocketServer.BaseRequestHandler):
             self.request.sendall("RESULT\ncode: 0\n")
         self._parsemessage(datagram)
 
+
 class udsserver(SocketServer.ThreadingUnixStreamServer):
 
     name = "netsrv"
@@ -93,7 +94,7 @@ class udsserver(SocketServer.ThreadingUnixStreamServer):
         os.chown(self.socketconf['file'], uid, gid)
         self.loghandle.debug(" Done setting up socket server at %s",
                              self.socketconf['file'])
-
+        
         return
 
     def processStart(self):
@@ -116,3 +117,14 @@ class udsserver(SocketServer.ThreadingUnixStreamServer):
         os.setuid(running_uid)
         # Ensure a very conservative umask
         old_umask = os.umask(077)
+        
+#class udsserverprocess(multiprocessing.Process):
+        #def __init__(self, target=self.run):
+            #self.target = target
+            #multiprocessing.Process.__init__(self)
+            #self.exit = multiprocessing.Event()
+
+  
+        #def shutdown(self):
+            #self.exit.set()
+      

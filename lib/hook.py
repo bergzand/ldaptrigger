@@ -6,8 +6,10 @@ import importlib
 import Queue
 import multiprocessing
 import subprocess
+import traceback
 
-class hookhandler:
+
+class hookhandler(multiprocessing.Process):
     #initialize hookhandler and start thread
     def __init__(self, hookconf, loghandle, queue):
         self.hookconf = dict(hookconf)
@@ -16,10 +18,9 @@ class hookhandler:
         self.loghandle = loghandle
         self.hooks = self.gethooks()
         self.loghandle.debug("starting thread")
-        p = multiprocessing.Process(target=self.run)
-        p.daemon = True
-        p.start()
-
+        multiprocessing.Process.__init__(self)
+        self.exit = multiprocessing.Event()
+   
     def _dropToUser(self, user, group):
         if os.getuid() != 0:
             self.loghandle.info('Not running as root, unable to drop to configged user')
@@ -37,20 +38,24 @@ class hookhandler:
         # Ensure a very conservative umask
         old_umask = os.umask(077)
 
-    def inithooks(self):
-        pass
 
     #function to thread with, should listen on the queue
     def run(self):
         self.inithooks()
         self._dropToUser(self.hookconf['user'], self.hookconf['group'])
-        while True:
-            item = self.queue.get()
+        while not self.exit.is_set():
+            try:
+                item = self.queue.get(timeout=0.3)
+            except Queue.Empty:
+                continue
             self.loghandle.debug("queue item: %s", item)
             reqdn, reqmod, reqresult = item
             self.handle(reqdn, reqmod, reqresult)
             self.queue.task_done()
+        self.loghandle.critical("caught exitsignal, exiting")
 
+    def shutdown(self):
+        self.exit.set()
 
 class exechookhandler(hookhandler):
     
@@ -81,6 +86,8 @@ class exechookhandler(hookhandler):
             exechooks.append(hook)
         self.exechooks = exechooks
 
+    def inithooks(self):
+        pass
 
 class pyhookhandler(hookhandler):
     #get all python modules in a dir
