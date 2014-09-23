@@ -53,8 +53,8 @@ class hookhandler(multiprocessing.Process):
             else:
                 rtn=True
         else:
-            os.setuid(running_uid)
             os.setgid(running_gid)
+            os.setuid(running_uid)
             os.setgroups([])
             self.loghandle.info('Dropped to %s:%s', user, group)
             rtn = True
