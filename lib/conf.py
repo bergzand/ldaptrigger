@@ -16,8 +16,7 @@ class cfg:
     
     DEFAULTS = {'loglevel': 'WARNING',
                 'hooktype': 'python',
-                'user': 'root',
-                'group': 'root'}
+                }
 
     import log
 

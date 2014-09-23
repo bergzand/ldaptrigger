@@ -59,7 +59,9 @@ class udshandler(SocketServer.BaseRequestHandler):
             datagram = ''.join(total_data)
             self.loghandle.debug('total data: %s', ''.join(total_data))
             msgtype = datagram.split('\n', 1)[0]
-            if  msgtype != "UNBIND":
+            if msgtype == "PING":
+                pass
+            elif  msgtype != "UNBIND":
                 self.request.sendall("RESULT\ncode: 0\n")
             else:
                 unbind = True
@@ -98,37 +100,50 @@ class udsserver(SocketServer.ThreadingUnixStreamServer):
         os.chown(self.socketconf['file'], uid, gid)
         self.loghandle.debug(" Done setting up socket server at %s",
                              self.socketconf['file'])
-        
-        return
 
     def processStart(self):
-        self._dropToUser(self.socketconf['user'], self.socketconf['group'])
-        self.serve_forever()
+        if self._dropToUser(self.socketconf['user'], self.socketconf['group']):
+            
+            self.serve_forever()
+        else:
+            return None
 
     def _dropToUser(self, user, group):
-        if os.getuid() != 0:
-            self.loghandle.info('Not running as root, unable to drop to configged user')
-            # We're not root so, like, whatever dude
-            return
-        # Get the uid/gid from the name
-        running_uid = pwd.getpwnam(user).pw_uid
-        running_gid = grp.getgrnam(group).gr_gid
+        rtn = False
+        cur_user = os.getuid()
+        cur_group = os.getgid()
+        print user
+        if user:
+            try:
+                running_uid = pwd.getpwnam(user).pw_uid
+            except KeyError as e:
+                self.loghandle.critical(e)
+                return False
+        else:
+            running_uid = cur_user
+        if group:
+            try:
+                running_gid = grp.getgrnam(group).gr_gid
+            except KeyError as e:
+                self.loghandle.critical(e)
+                return False
+        else:
+            running_gid = cur_group
         # Remove group privileges
-        os.setgroups([])
-        # Try setting the new uid/gid
-        self.loghandle.info('Dropping to %s:%s', user, group)
-        os.setgid(running_gid)
-        os.setuid(running_uid)
         # Ensure a very conservative umask
         old_umask = os.umask(077)
-        
-#class udsserverprocess(multiprocessing.Process):
-        #def __init__(self, target=self.run):
-            #self.target = target
-            #multiprocessing.Process.__init__(self)
-            #self.exit = multiprocessing.Event()
-
-  
-        #def shutdown(self):
-            #self.exit.set()
-      
+        if os.getuid() != 0:
+            if cur_user != running_uid:
+                self.loghandle.critical('Not running as root, unable to drop to configged user')
+                
+            elif cur_group != running_gid:
+                self.loghandle.critical('Not running as root, unable to drop to configged group')
+            else:
+                rtn=True
+        else:
+            os.setuid(running_uid)
+            os.setgid(running_gid)
+            os.setgroups([])
+            self.loghandle.info('Dropped to %s:%s', user, group)
+            rtn = True
+        return rtn

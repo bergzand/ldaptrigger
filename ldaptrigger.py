@@ -14,7 +14,7 @@ import subprocess
 import SocketServer
 import traceback
 import sys
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, Event
 import signal
 
 loghandle = None
@@ -27,17 +27,32 @@ def signalhandler(signum=None, frame=None):
     shutdownProcesses()
     sys.exit(0)
 
+
 def registerhook(hookconf):
+    """Start and register a hook
+
+    :param hookconf: A dict with the config of the hook to register
+    """
+    rtn = False
     hookcfg = dict(hookconf)
     hookclass = config.getHookType(hookcfg['hooktype'])
     hookqueue = Queue()
     hookname = hookcfg[config.HOOKNAME]
     hooklevel = hookcfg[config.LOGLEVEL]
+    hookevent = Event()
     hookprocess = hookclass(hookconf,
-                           logobject.getLoggerHandle(hookname, hooklevel),
-                           hookqueue)
+                            logobject.getLoggerHandle(hookname, hooklevel),
+                            hookqueue,
+                            hookevent
+                            )
     hookprocess.start()
-    registeredhooks.append((hookname, hook, hookprocess, hookqueue))
+    if hookevent.wait(2.0):
+        registeredhooks.append((hookname, hook, hookprocess, hookqueue))
+        rtn = True
+    else:
+        loghandle.critical("Failed to start hook process {}".format(hookname))
+        rtn = False
+    return rtn
 
 
 def callback(request):
@@ -62,7 +77,6 @@ def shutdownServer():
     serverprocess.terminate()
 
 
-#main function
 if __name__ == '__main__':
     #load config
     signal.signal(15, signalhandler)
@@ -78,13 +92,13 @@ if __name__ == '__main__':
     hooklist = config.getHookList()
     #register each hook in array
     for conf in hooklist:
-        registerhook(conf)
-    socketconf = config.getSectionCfg("socket")
-    server = udsserver.udsserver(socketconf,
-                                 lambda *args, **keys: 
-                                     udsserver.udshandler(logobject, callback, *args, **keys)
-                                 , logobject)
-    serverprocess = Process(target=server.processStart)
-    serverprocess.daemon=True
-    serverprocess.start()
-    serverprocess.join()
+        if not registerhook(conf):
+            break
+    else:
+        socketconf = config.getSectionCfg("socket")
+        server = udsserver.udsserver(socketconf,
+                                     lambda *args, **keys: udsserver.udshandler(logobject, callback, *args, **keys), logobject)
+        serverprocess = Process(target=server.processStart)
+        serverprocess.start()
+        serverprocess.join()
+    loghandle.info("Exiting")

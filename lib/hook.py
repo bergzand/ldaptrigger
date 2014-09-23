@@ -11,38 +11,65 @@ import traceback
 
 class hookhandler(multiprocessing.Process):
     #initialize hookhandler and start thread
-    def __init__(self, hookconf, loghandle, queue):
+    def __init__(self, hookconf, loghandle, queue, event):
         self.hookconf = dict(hookconf)
         self.hookdir = self.hookconf['hookdir']
         self.queue = queue
         self.loghandle = loghandle
+        self.successevent = event
         self.hooks = self.gethooks()
         self.loghandle.debug("starting thread")
         multiprocessing.Process.__init__(self)
         self.exit = multiprocessing.Event()
    
     def _dropToUser(self, user, group):
-        if os.getuid() != 0:
-            self.loghandle.info('Not running as root, unable to drop to configged user')
-            # We're not root so, like, whatever dude
-            return
-        # Get the uid/gid from the name
-        running_uid = pwd.getpwnam(user).pw_uid
-        running_gid = grp.getgrnam(group).gr_gid
+        rtn = False
+        cur_user = os.getuid()
+        cur_group = os.getgid()
+        print user
+        if user:
+            try:
+                running_uid = pwd.getpwnam(user).pw_uid
+            except KeyError as e:
+                self.loghandle.critical(e)
+        else:
+            running_uid = cur_user
+        if group:
+            try:
+                running_gid = grp.getgrnam(group).gr_gid
+            except KeyError as e:
+                self.loghandle.critical(e)
+        else:
+            running_gid = cur_group
         # Remove group privileges
-        os.setgroups([])
-        # Try setting the new uid/gid
-        self.loghandle.info('Dropping to %s:%s', user, group)
-        os.setgid(running_gid)
-        os.setuid(running_uid)
         # Ensure a very conservative umask
         old_umask = os.umask(077)
+        if os.getuid() != 0:
+            if cur_user != running_uid:
+                self.loghandle.critical('Not running as root, unable to drop to configged user')
+                
+            elif cur_group != running_gid:
+                self.loghandle.critical('Not running as root, unable to drop to configged group')
+            else:
+                rtn=True
+        else:
+            os.setuid(running_uid)
+            os.setgid(running_gid)
+            os.setgroups([])
+            self.loghandle.info('Dropped to %s:%s', user, group)
+            rtn = True
+        return rtn
 
-
-    #function to thread with, should listen on the queue
     def run(self):
+        """function to thread with, should listen on the queue
+        """
         self.inithooks()
-        self._dropToUser(self.hookconf['user'], self.hookconf['group'])
+        user = self.hookconf.get('user', None)
+        group = self.hookconf.get('group', None)
+        if not self._dropToUser(user, group):
+            self.exit.set()
+        else:
+            self.successevent.set()
         while not self.exit.is_set():
             try:
                 item = self.queue.get(timeout=0.3)
@@ -56,6 +83,7 @@ class hookhandler(multiprocessing.Process):
 
     def shutdown(self):
         self.exit.set()
+
 
 class exechookhandler(hookhandler):
     
@@ -88,6 +116,7 @@ class exechookhandler(hookhandler):
 
     def inithooks(self):
         pass
+
 
 class pyhookhandler(hookhandler):
     #get all python modules in a dir
@@ -129,10 +158,6 @@ class pyhookhandler(hookhandler):
             pyhook = importlib.import_module(hook)
             pyhooks.append(pyhook.Hook())
         return pyhooks
-
-
-        
-        
 
 
 class pyhook:
