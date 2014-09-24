@@ -47,7 +47,6 @@ class udshandler(SocketServer.BaseRequestHandler):
                 data = self.request.recv(1024)
                 if not data:
                     return
-                self.loghandle.debug("received : %s", data)
                 if data.endswith(endmarker):
                     self.loghandle.debug('complete message received')
                     total_data.append(data)
@@ -57,10 +56,9 @@ class udshandler(SocketServer.BaseRequestHandler):
                     self.loghandle.debug('complete message received')
                     break
             datagram = ''.join(total_data)
-            self.loghandle.debug('total data: %s', ''.join(total_data))
             msgtype = datagram.split('\n', 1)[0]
             if msgtype == "PING":
-                pass
+                self.request.sendall("RESULT\ncode: 0\n")
             elif  msgtype != "UNBIND":
                 self.request.sendall("RESULT\ncode: 0\n")
             else:

@@ -78,7 +78,6 @@ class hookhandler(multiprocessing.Process):
             self.loghandle.debug("queue item: %s", item)
             reqdn, reqmod, reqresult = item
             self.handle(reqdn, reqmod, reqresult)
-            self.queue.task_done()
         self.loghandle.critical("caught exitsignal, exiting")
 
     def shutdown(self):

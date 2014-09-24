@@ -39,6 +39,7 @@ def registerhook(hookconf):
     hookqueue = Queue()
     hookname = hookcfg[config.HOOKNAME]
     hooklevel = hookcfg[config.LOGLEVEL]
+    ldaphook = hookcfg[config.HOOKHOOK]
     hookevent = Event()
     hookprocess = hookclass(hookconf,
                             logobject.getLoggerHandle(hookname, hooklevel),
@@ -47,7 +48,7 @@ def registerhook(hookconf):
                             )
     hookprocess.start()
     if hookevent.wait(2.0):
-        registeredhooks.append((hookname, hook, hookprocess, hookqueue))
+        registeredhooks.append((hookname, ldaphook, hookprocess, hookqueue))
         rtn = True
     else:
         loghandle.critical("Failed to start hook process {}".format(hookname))
@@ -60,7 +61,7 @@ def callback(request):
     item = (dn, mod, result)
     loghandle.debug("checking hooks for matching type")
     for hookname, hook, hookprocess, hookqueue in registeredhooks:
-        loghandle.debug("trying to match \"%s\" with \"%s\"", requesthook, hookname)
+        loghandle.debug("trying to match \"%s\" with \"%s\"", requesthook, hook)
         if hook == requesthook:
             loghandle.debug("dispatching item to queue")
             hookqueue.put(item)
