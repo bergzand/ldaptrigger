@@ -59,8 +59,9 @@ class udshandler(SocketServer.BaseRequestHandler):
             msgtype = datagram.split('\n', 1)[0]
             if msgtype == "PING":
                 self.request.sendall("RESULT\ncode: 0\n")
-            elif  msgtype != "UNBIND":
+            elif msgtype != "UNBIND":
                 self.request.sendall("RESULT\ncode: 0\n")
+                self._parsemessage(datagram)
             else:
                 unbind = True
 

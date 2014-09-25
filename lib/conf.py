@@ -12,6 +12,7 @@ class cfg:
     HOOKNAME = "hookname"
     HOOKHOOK = "hook"
     HOOKDIR = "hookdir"
+    HOOKBASEDN = "basedn"
     LOGLEVEL = "loglevel"
     
     DEFAULTS = {'loglevel': 'WARNING',
