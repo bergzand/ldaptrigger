@@ -60,7 +60,7 @@ def callback(request):
     item = (dn, mod, result)
     loghandle.debug("checking hooks for matching type")
     for hookname, hookcfg, hookprocess, hookqueue in registeredhooks:
-        loghandle.debug("trying to match \"%s\" with \"%s\"", requesthook, hook)
+        loghandle.debug("trying to match \"%s\" with \"%s\"", requesthook, hookcfg[config.HOOKHOOK])
         if hookcfg[config.HOOKHOOK] == requesthook and dn.lower().endswith(hookcfg[config.HOOKBASEDN]):
             loghandle.debug("dispatching item to queue")
             hookqueue.put(item)

@@ -17,6 +17,7 @@ class cfg:
     
     DEFAULTS = {'loglevel': 'WARNING',
                 'hooktype': 'python',
+                'basedn': '',
                 }
 
     import log

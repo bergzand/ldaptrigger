@@ -75,7 +75,7 @@ class hookhandler(multiprocessing.Process):
                 item = self.queue.get(timeout=0.3)
             except Queue.Empty:
                 continue
-            self.loghandle.debug("queue item: %s", item)
+            #self.loghandle.debug("queue item: %s", item)
             reqdn, reqmod, reqresult = item
             self.handle(reqdn, reqmod, reqresult)
         self.loghandle.critical("caught exitsignal, exiting")
@@ -136,7 +136,9 @@ class pyhookhandler(hookhandler):
     def handle(self, dn, reqmod, reqresult):
         self.loghandle.info("executing hooks")
         for pyhook in self.hooks:
-            pyhook.handle(dn, reqmod, reqresult)
+            self.loghandle.debug("Executing %s", pyhook)
+            result = pyhook.handle(dn, reqmod, reqresult)
+            self.loghandle.debug("Result: %s", result)
 
     def inithooks(self):
         self.loghandle.info("initializing hooks")
@@ -161,7 +163,7 @@ class pyhookhandler(hookhandler):
 
 class pyhook:
     def __init__(self):
-        print "__init__ pyhook now"
+        print "init pyhook now"
         pass
 
     def inithook(self, loghandle):
@@ -169,4 +171,4 @@ class pyhook:
         self.loghandle.debug("initializing hook now")
    
     def handle(self, dn, reqmod, reqresult):
-        pass
+        return True
