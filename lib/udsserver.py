@@ -22,7 +22,7 @@ class udshandler(SocketServer.BaseRequestHandler):
         ldifdata = ldif.LDIFRecordList(StringIO.StringIO(payload))
         ldifdata.parse()
         ldifdn, ldifattr = ldifdata.all_records[0]
-        self.loghandle.debug("ldif data dn = %s,attrs= %s", ldifdn, ldifattr)
+        #self.loghandle.debug("ldif data dn = %s,attrs= %s", ldifdn, ldifattr)
         reqdn = ldifattr['reqDN'][0]
         reqtype = ldifattr['reqType'][0]
         if reqtype != "delete":
@@ -32,12 +32,11 @@ class udshandler(SocketServer.BaseRequestHandler):
         reqresult = ldifattr['reqResult'][0]
         req = (reqtype, reqdn, reqmod, reqresult)
         self.callback(req)
-        self.loghandle.debug("ldif parsed data: type= %s, dn = %s, mod = %s",
-                             reqtype, reqdn, reqmod)
+        #self.loghandle.debug("ldif parsed data: type= %s, dn = %s, mod = %s",
+        #                     reqtype, reqdn, reqmod)
 
     def handle(self):
         endmarker = '\n\n'
-        self.loghandle.debug("connection received")
         total_data = []
         data =''
         unbind = False
@@ -48,20 +47,20 @@ class udshandler(SocketServer.BaseRequestHandler):
                 if not data:
                     return
                 if data.endswith(endmarker):
-                    self.loghandle.debug('complete message received')
                     total_data.append(data)
                     break
                 total_data.append(data)
                 if ''.join(total_data).endswith(endmarker):
-                    self.loghandle.debug('complete message received')
                     break
             datagram = ''.join(total_data)
             msgtype = datagram.split('\n', 1)[0]
+            self.loghandle.debug('complete message received of type {0}'.format(msgtype))
             if msgtype == "PING":
                 self.request.sendall("RESULT\ncode: 0\n")
             elif msgtype != "UNBIND":
                 self.request.sendall("RESULT\ncode: 0\n")
                 self._parsemessage(datagram)
+                unbind = True
             else:
                 unbind = True
 
