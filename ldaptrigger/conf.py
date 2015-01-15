@@ -1,3 +1,5 @@
+import ConfigParser
+
 class cfg:
     
     #logstuf
@@ -20,10 +22,8 @@ class cfg:
                 'basedn': '',
                 }
 
-    import log
-
     def __init__(self, file):
-        import ConfigParser
+
         self.cfparser = ConfigParser.SafeConfigParser(cfg.DEFAULTS, allow_no_value=True)
         with open(file, 'r') as f:
             self.cfparser.readfp(f)

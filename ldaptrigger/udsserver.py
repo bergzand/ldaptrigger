@@ -1,7 +1,7 @@
 import SocketServer
 import StringIO
 import ldif
-import log 
+
 import pwd
 import grp
 import os
