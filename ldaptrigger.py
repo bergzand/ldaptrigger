@@ -4,10 +4,10 @@ Documentation, License etc.
 
 @package ldaptrigger
 '''
-import lib.conf as config
-import lib.log as log
-import lib.udsserver as udsserver
-import lib.hook as hook
+import ldaptrigger.conf as config
+import ldaptrigger.log as log
+import ldaptrigger.udsserver as udsserver
+import ldaptrigger.hook as hook
 
 import os
 import subprocess
